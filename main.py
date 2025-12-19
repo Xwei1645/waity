@@ -1,5 +1,6 @@
 import sys
 import argparse
+import os
 
 from PySide6.QtWidgets import QApplication, QDialog, QHBoxLayout, QVBoxLayout, QLabel, QSystemTrayIcon, QMenu
 from PySide6.QtCore import QTimer, Qt, QEvent
@@ -16,13 +17,25 @@ from qfluentwidgets import (
 )
 
 
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller/Nuitka"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except AttributeError:
+        # Nuitka or development
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
+
+
 class MainDialog(QDialog):
     def __init__(self, args) -> None:
         super().__init__()
         self.args = args
         setTheme(Theme.AUTO)
+        self.icon_path = get_resource_path("icon.png")
         self.setWindowTitle("Waity")
-        self.setWindowIcon(QIcon("icon.png"))
+        self.setWindowIcon(QIcon(self.icon_path))
         self.setWindowFlag(Qt.WindowCloseButtonHint, False)
         self.resize(460, 260)
         if self.args.countdown:
@@ -76,7 +89,7 @@ class MainDialog(QDialog):
 
     def _init_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon("icon.png"))
+        self.tray_icon.setIcon(QIcon(self.icon_path))
         self.tray_icon.setToolTip(f"Waity：{self.remaining} 秒后自动关机")
 
         # 创建托盘菜单
