@@ -5,11 +5,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-nuitka:
     runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
 
     - name: Set up uv
       uses: astral-sh/setup-uv@v3
@@ -23,7 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         uv sync
-        uv pip install nuitka pyinstaller
+        uv pip install nuitka
 
     - name: Build with Nuitka
       run: |
@@ -35,6 +37,28 @@ jobs:
         name: waity-nuitka-windows
         path: main.exe
         if-no-files-found: error
+
+  build-pyinstaller:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v3
+
+    - name: Install Python 3.10.11
+      run: uv python install 3.10.11
+
+    - name: Pin Python version
+      run: uv python pin 3.10.11
+
+    - name: Install dependencies
+      run: |
+        uv sync
+        uv pip install pyinstaller
 
     - name: Build with PyInstaller
       run: |
