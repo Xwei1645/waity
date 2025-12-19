@@ -37,6 +37,7 @@ class MainDialog(QDialog):
         self.setWindowTitle("Waity")
         self.setWindowIcon(QIcon(self.icon_path))
         self.setWindowFlag(Qt.WindowCloseButtonHint, False)
+        self.setWindowFlag(Qt.WindowStaysOnTopHint)
         self.resize(460, 260)
         if self.args.countdown:
             self.remaining = self.args.countdown
