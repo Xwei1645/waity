@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v3
+
+    - name: Install Python 3.10.11
+      run: uv python install 3.10.11
+
+    - name: Pin Python version
+      run: uv python pin 3.10.11
+
+    - name: Install dependencies
+      run: |
+        uv pip install -e .
+        uv pip install PySide6 nuitka pyinstaller
+
+    - name: Build with Nuitka
+      run: |
+        uv run python -m nuitka --onefile --enable-plugin=pyside6 --include-data-files=icon.png=icon.png main.py
+
+    - name: Upload Nuitka build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: waity-nuitka-windows
+        path: main.exe
+        if-no-files-found: error
+
+    - name: Build with PyInstaller
+      run: |
+        uv run pyinstaller --onefile --add-data "icon.png;." main.py
+
+    - name: Upload PyInstaller build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: waity-pyinstaller-windows
+        path: dist/main.exe
+        if-no-files-found: error
