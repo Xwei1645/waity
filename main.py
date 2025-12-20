@@ -83,10 +83,13 @@ class MainWindow(QWidget):
         # 设置全屏透明窗口
         self.setWindowTitle("Waity")
         self.setWindowIcon(QIcon(self.icon_path))
-        self.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint
-        )
+        
+        # 根据参数设置是否显示在任务栏
+        window_flags = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        if not self.args.show_in_taskbar:
+            window_flags |= Qt.Tool  # 不显示在任务栏
+        
+        self.setWindowFlags(window_flags)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.showFullScreen()
 
@@ -204,6 +207,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Waity')
     parser.add_argument('--countdown', type=int, default=60, help='倒计时时长（秒），默认 60 秒')
     parser.add_argument('--delay', type=int, default=3, help='延迟选项时长（分钟），默认 3 分钟')
+    parser.add_argument('--show-in-taskbar', action='store_true', help='显示在任务栏中（默认不显示）')
     args = parser.parse_args()
 
     if args.countdown <= 0 or args.delay <= 0:

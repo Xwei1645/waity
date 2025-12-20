@@ -63,6 +63,7 @@ Waity 支持通过命令行参数自定义启动行为。您可以组合使用 `
 |------|------|--------|
 | `--countdown` | 倒计时时长（秒） | 60 |
 | `--delay` | 延迟选项时长（分钟） | 3 |
+| `--show-in-taskbar` | 显示在任务栏中 | 无（不显示） |
 
 > [!IMPORTANT]
 > 参数必须为非零自然数。
@@ -83,7 +84,9 @@ Waity 支持通过命令行参数自定义启动行为。您可以组合使用 `
 ```shell
 .\run main.exe --countdown 600 --delay 5
 ```
-
+```shell
+.\main.exe --show-in-taskbar  # 显示在任务栏中
+```
 ## 许可证
 
 本项目基于 [GPL v3](https://github.com/Xwei1645/waity?tab=GPL-3.0-1-ov-file) 开放源代码。
