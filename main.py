@@ -2,12 +2,12 @@ import sys
 import argparse
 import os
 
-from PySide6.QtWidgets import QApplication, QDialog, QHBoxLayout, QVBoxLayout, QLabel, QSystemTrayIcon, QMenu
-from PySide6.QtCore import QTimer, Qt, QEvent
+from PySide6.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QSystemTrayIcon, QMenu
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QIcon, QAction
 from qfluentwidgets import (
-    BodyLabel,
     FluentIcon,
+    MessageBoxBase,
     PrimaryPushButton,
     PushButton,
     SubtitleLabel,
@@ -28,65 +28,91 @@ def get_resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-class MainDialog(QDialog):
+class ShutdownMessageBox(MessageBoxBase):
+    """基于 MessageBoxBase 的关机提示框"""
+
+    def __init__(self, parent, args) -> None:
+        super().__init__(parent)
+        self.args = args
+        self.remaining = args.countdown if args.countdown else 60
+
+        self._setup_content()
+        self._setup_buttons()
+
+    def _setup_content(self) -> None:
+        title = TitleLabel("即将关机", self)
+        self.subtitle_label = SubtitleLabel(
+            f"计算机将在 {self.remaining} 秒后自动关闭。请及时保存您的工作或选择其他操作。", self
+        )
+
+        self.viewLayout.addWidget(title)
+        self.viewLayout.addWidget(self.subtitle_label)
+
+    def _setup_buttons(self) -> None:
+        # 隐藏默认按钮
+        self.yesButton.hide()
+        self.cancelButton.hide()
+
+        # 创建自定义按钮
+        self.primary_btn = PrimaryPushButton(FluentIcon.CHECKBOX, "已阅", self)
+        self.secondary_btn = PushButton(FluentIcon.POWER_BUTTON, "立即关机", self)
+        self.third_btn = PushButton(FluentIcon.DATE_TIME, f"延迟 {self.args.delay} 分钟", self)
+        self.close_btn = PushButton(FluentIcon.CLOSE, "取消关机计划", self)
+
+        self.buttonLayout.addWidget(self.primary_btn)
+        self.buttonLayout.addStretch(1)
+        self.buttonLayout.addWidget(self.secondary_btn)
+        self.buttonLayout.addWidget(self.third_btn)
+        self.buttonLayout.addWidget(self.close_btn)
+
+    def update_subtitle(self) -> None:
+        self.subtitle_label.setText(
+            f"计算机将在 {self.remaining} 秒后自动关闭。请及时保存您的工作或选择其他操作。"
+        )
+
+
+class MainWindow(QWidget):
+    """全屏透明主窗口"""
+
     def __init__(self, args) -> None:
         super().__init__()
         self.args = args
         setTheme(Theme.AUTO)
         self.icon_path = get_resource_path("icon.png")
+
+        # 设置全屏透明窗口
         self.setWindowTitle("Waity")
         self.setWindowIcon(QIcon(self.icon_path))
-        self.setWindowFlag(Qt.WindowCloseButtonHint, False)
-        self.setWindowFlag(Qt.WindowStaysOnTopHint)
-        self.resize(460, 260)
+        self.setWindowFlags(
+            Qt.FramelessWindowHint |
+            Qt.WindowStaysOnTopHint
+        )
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.showFullScreen()
+
+        # 初始化倒计时
         if self.args.countdown:
             self.remaining = self.args.countdown
             self.timer = QTimer(self)
             self.timer.timeout.connect(self.update_countdown)
             self.timer.start(1000)
+
         self._init_ui()
         self._init_tray()
 
     def _init_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.setContentsMargins(24, 24, 24, 16)
+        # 创建消息框
+        self.message_box = ShutdownMessageBox(self, self.args)
+        self.message_box.remaining = self.remaining
 
-        title = TitleLabel("即将关机")
-        layout.addWidget(title)
+        # 连接按钮信号
+        self.message_box.primary_btn.clicked.connect(self.on_primary_clicked)
+        self.message_box.secondary_btn.clicked.connect(self.on_secondary_clicked)
+        self.message_box.third_btn.clicked.connect(self.on_third_clicked)
+        self.message_box.close_btn.clicked.connect(self.cancel_shutdown)
 
-        subtitle = SubtitleLabel("计算机将在 60 秒后自动关闭。请及时保存您的工作或选择其他操作。")
-        layout.addWidget(subtitle)
-
-        if self.args.countdown:
-            self.subtitle_label = SubtitleLabel(f"计算机将在 {self.remaining} 秒后自动关闭。请及时保存您的工作或选择其他操作。")
-            layout.addWidget(self.subtitle_label)
-            # 隐藏原来的subtitle
-            subtitle.hide()
-        else:
-            self.subtitle_label = subtitle
-
-        layout.addStretch(1)
-
-        button_row = QHBoxLayout()
-        button_row.setSpacing(12)
-        layout.addLayout(button_row)
-
-        self.primary_btn = PrimaryPushButton(FluentIcon.CHECKBOX, "已阅")
-        self.secondary_btn = PushButton(FluentIcon.POWER_BUTTON, "立即关机")
-        self.third_btn = PushButton(FluentIcon.DATE_TIME, f"延迟 {self.args.delay} 分钟")
-        self.close_btn = PushButton(FluentIcon.CLOSE, "取消关机计划")
-
-        button_row.addWidget(self.primary_btn)
-        button_row.addStretch(1)
-        button_row.addWidget(self.secondary_btn)
-        button_row.addWidget(self.third_btn)
-        button_row.addWidget(self.close_btn)
-
-        self.primary_btn.clicked.connect(self.on_primary_clicked)
-        self.secondary_btn.clicked.connect(self.on_secondary_clicked)
-        self.third_btn.clicked.connect(self.on_third_clicked)
-        self.close_btn.clicked.connect(self.cancel_shutdown)
+        # 显示消息框
+        self.message_box.show()
 
     def _init_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
@@ -113,12 +139,14 @@ class MainDialog(QDialog):
 
     def on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
-            self.show()
+            self.showFullScreen()
+            self.message_box.show()
             self.raise_()
             self.activateWindow()
 
     def update_ui(self):
-        self.subtitle_label.setText(f"计算机将在 {self.remaining} 秒后自动关闭。请及时保存您的工作或选择其他操作。")
+        self.message_box.remaining = self.remaining
+        self.message_box.update_subtitle()
         self.time_action.setText(f"剩余时间：{self.remaining} 秒")
         self.tray_icon.setToolTip(f"Waity：{self.remaining} 秒后自动关机")
 
@@ -141,7 +169,9 @@ class MainDialog(QDialog):
         os.system("shutdown /s /t 0")
 
     def cancel_shutdown(self):
-        self.quit_app()
+        self.message_box.close()
+        # 延迟关闭窗口，让 MessageBox 动画播放完成
+        QTimer.singleShot(500, self.quit_app)
 
     def quit_app(self):
         if hasattr(self, 'timer'):
@@ -149,6 +179,7 @@ class MainDialog(QDialog):
         QApplication.quit()
 
     def on_primary_clicked(self):
+        self.message_box.hide()
         self.hide()
 
     def on_secondary_clicked(self):
@@ -164,7 +195,9 @@ class MainDialog(QDialog):
             self.timer.timeout.connect(self.update_countdown)
             self.timer.start(1000)
             self.update_ui()
-        self.hide()
+        self.message_box.close()
+        # 延迟关闭窗口，让 MessageBox 动画播放完成
+        QTimer.singleShot(300, self.hide)
 
 
 def main() -> None:
@@ -178,8 +211,8 @@ def main() -> None:
         sys.exit(1)
 
     app = QApplication(sys.argv)
-    dialog = MainDialog(args)
-    dialog.show()
+    window = MainWindow(args)
+    window.show()
     sys.exit(app.exec())
 
 
